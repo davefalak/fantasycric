@@ -232,8 +232,8 @@ async function bootstrap() {
     }
   });
 
-  server.listen(port, () => {
-    console.log(`Fantasy IPL 2026 API listening on http://localhost:${port}`);
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`Fantasy IPL 2026 API listening on port ${port}`);
   });
 }
 
