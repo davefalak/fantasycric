@@ -1,0 +1,27 @@
+{
+  "name": "fantasy-ipl-2026",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck:shared && npm run typecheck:api && npm run typecheck:web",
+    "typecheck:shared": "npm run typecheck --workspace @fantasy/shared",
+    "typecheck:api": "npm run typecheck --workspace @fantasy/api",
+    "typecheck:web": "npm run typecheck --workspace @fantasy/web",
+    "build:shared": "npm run build --workspace @fantasy/shared",
+    "build:api": "npm run build --workspace @fantasy/api",
+    "build:web": "npm run build --workspace @fantasy/web",
+    "start:api": "npm run start --workspace @fantasy/api",
+    "seed:ipl-roster": "npm run seed:ipl-roster --workspace @fantasy/api",
+    "test:api": "npm run test --workspace @fantasy/api",
+    "start:web": "npm run start --workspace @fantasy/web",
+    "dev:api": "npm run dev --workspace @fantasy/api",
+    "dev:web": "npm run dev --workspace @fantasy/web"
+  },
+  "devDependencies": {
+    "typescript": "5.8.2"
+  }
+}

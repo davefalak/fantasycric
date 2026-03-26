@@ -1,0 +1,10 @@
+{
+  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "ler  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collection"  "collecapp.service.ts << 'EOF'
+import { Injectable } from "@nestjs/common";
+
+@Injectable()
+export class AppService {
+  health() {
+    return { status: "ok", service: "fantasy-api" };
+  }
+}

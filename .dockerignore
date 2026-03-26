@@ -1,0 +1,19 @@
+.git
+.github
+.vscode
+node_modules
+npm-debug.log
+*.log
+dist
+coverage
+tmp
+.DS_Store
+
+# Local env files
+.env
+.env.*
+
+# Large local assets not needed for container runtime
+players.pdf
+players_page-*.png
+players_page1.png

@@ -1,0 +1,22 @@
+FROM node:20-slim
+
+WORKDIR /app
+
+# Install workspace dependencies first for better layer caching.
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY packages/shared/package.json packages/shared/package.json
+COPY apps/web/package.json apps/web/package.json
+
+RUN npm ci
+
+# Copy source after dependencies.
+COPY . .
+
+ENV NODE_ENV=production
+ENV PORT=8080
+
+EXPOSE 8080
+
+# Cloud Run provides PORT. Map it to API_PORT expected by the app.
+CMD ["sh", "-c", "API_PORT=${PORT:-8080} npx tsx apps/api/src/main.ts"]

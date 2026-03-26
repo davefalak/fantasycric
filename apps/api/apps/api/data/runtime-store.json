@@ -1,0 +1,172 @@
+{
+  "leagues": [
+    {
+      "id": "817eabbd-5f3c-4cfe-b67a-16e5e6468f44",
+      "creatorId": "owner-http",
+      "name": "HTTP Smoke League",
+      "memberLimit": 4,
+      "totalBudget": 100,
+      "joinDeadline": "2026-05-01T12:00:00.000Z",
+      "scoringPreferences": {
+        "wicket": 25
+      },
+      "state": "draft",
+      "inviteCode": "Z85SMAL0",
+      "memberCount": 2,
+      "createdAt": "2026-03-24T22:07:49.049Z"
+    },
+    {
+      "id": "b7320674-3922-4d7e-8ab5-c5ac921f2303",
+      "creatorId": "owner-http",
+      "name": "HTTP Smoke League",
+      "memberLimit": 4,
+      "totalBudget": 100,
+      "joinDeadline": "2026-05-01T12:00:00.000Z",
+      "scoringPreferences": {
+        "wicket": 25
+      },
+      "state": "draft",
+      "inviteCode": "Q7VDQQAH",
+      "memberCount": 2,
+      "createdAt": "2026-03-24T22:10:00.207Z"
+    },
+    {
+      "id": "ce965c33-d9e1-481e-99c9-679a85066f3e",
+      "creatorId": "demo-user",
+      "name": "Dhamaka 2026",
+      "description": "Dhamaka",
+      "memberLimit": 10,
+      "totalBudget": 100,
+      "joinDeadline": "2026-03-26T17:40",
+      "scoringPreferences": {},
+      "state": "draft",
+      "inviteCode": "KEOHTM79",
+      "memberCount": 1,
+      "createdAt": "2026-03-24T22:41:00.321Z"
+    }
+  ],
+  "leagueMembers": [
+    {
+      "id": "0ea5bfbb-f8d1-4a7f-a75f-b47869327eab",
+      "leagueId": "817eabbd-5f3c-4cfe-b67a-16e5e6468f44",
+      "userId": "owner-http",
+      "joinedAt": "2026-03-24T22:07:49.049Z"
+    },
+    {
+      "id": "695cb00d-01f8-4ada-90cd-637d8bae3050",
+      "leagueId": "817eabbd-5f3c-4cfe-b67a-16e5e6468f44",
+      "userId": "friend-http",
+      "joinedAt": "2026-03-24T22:07:49.564Z"
+    },
+    {
+      "id": "4c96745a-5d28-4795-a8fd-f95b3f89a08c",
+      "leagueId": "b7320674-3922-4d7e-8ab5-c5ac921f2303",
+      "userId": "owner-http",
+      "joinedAt": "2026-03-24T22:10:00.207Z"
+    },
+    {
+      "id": "9ffdd4be-23ab-4d0f-97a8-0a9eba0bc9b5",
+      "leagueId": "b7320674-3922-4d7e-8ab5-c5ac921f2303",
+      "userId": "friend-http",
+      "joinedAt": "2026-03-24T22:10:00.220Z"
+    },
+    {
+      "id": "caa8ba38-abf7-463a-91a7-35da57853106",
+      "leagueId": "ce965c33-d9e1-481e-99c9-679a85066f3e",
+      "userId": "demo-user",
+      "joinedAt": "2026-03-24T22:41:00.321Z"
+    }
+  ],
+  "leagueTeams": [
+    {
+      "id": "82b3d8ef-e554-4f14-90b7-06214145e127",
+      "leagueId": "b7320674-3922-4d7e-8ab5-c5ac921f2303",
+      "userId": "friend-http",
+      "teamName": "HTTP Boundary Riders",
+      "players": [
+        {
+          "playerId": "wk1",
+          "playerName": "Keeper One",
+          "teamCode": "MI",
+          "role": "WK",
+          "cost": 8
+        },
+        {
+          "playerId": "bat1",
+          "playerName": "Batter One",
+          "teamCode": "CSK",
+          "role": "BAT",
+          "cost": 9
+        },
+        {
+          "playerId": "bat2",
+          "playerName": "Batter Two",
+          "teamCode": "RCB",
+          "role": "BAT",
+          "cost": 9
+        },
+        {
+          "playerId": "bat3",
+          "playerName": "Batter Three",
+          "teamCode": "GT",
+          "role": "BAT",
+          "cost": 8
+        },
+        {
+          "playerId": "bat4",
+          "playerName": "Batter Four",
+          "teamCode": "DC",
+          "role": "BAT",
+          "cost": 8
+        },
+        {
+          "playerId": "ar1",
+          "playerName": "Allrounder One",
+          "teamCode": "RR",
+          "role": "AR",
+          "cost": 10
+        },
+        {
+          "playerId": "ar2",
+          "playerName": "Allrounder Two",
+          "teamCode": "LSG",
+          "role": "AR",
+          "cost": 9
+        },
+        {
+          "playerId": "bowl1",
+          "playerName": "Bowler One",
+          "teamCode": "SRH",
+          "role": "BOWL",
+          "cost": 8
+        },
+        {
+          "playerId": "bowl2",
+          "playerName": "Bowler Two",
+          "teamCode": "PBKS",
+          "role": "BOWL",
+          "cost": 7
+        },
+        {
+          "playerId": "bowl3",
+          "playerName": "Bowler Three",
+          "teamCode": "KKR",
+          "role": "BOWL",
+          "cost": 7
+        },
+        {
+          "playerId": "bowl4",
+          "playerName": "Bowler Four",
+          "teamCode": "MI",
+          "role": "BOWL",
+          "cost": 7
+        }
+      ],
+      "captainPlayerId": "ar1",
+      "viceCaptainPlayerId": "bat1",
+      "totalBudgetUsed": 90,
+      "createdAt": "2026-03-24T22:10:00.230Z",
+      "updatedAt": "2026-03-24T22:10:00.230Z"
+    }
+  ]
+}
