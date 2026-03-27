@@ -2,7 +2,7 @@ import type { CricbuzzLivePreview } from "./cricbuzz-live.service.ts";
 import { CricbuzzLiveService } from "./cricbuzz-live.service.ts";
 
 export interface LivePollerConfig {
-  provider: "auto" | "cricbuzz" | "espn" | "cricapi" | "cricketdata";
+  provider: "auto" | "espn" | "cricbuzz" | "cricketdata";
   matchId?: string;
   intervalMs: number;
   proxy: boolean;

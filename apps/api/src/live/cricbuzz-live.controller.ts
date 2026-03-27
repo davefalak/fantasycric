@@ -1,4 +1,4 @@
-import { CricbuzzLiveService, type CricbuzzLivePreview, type LiveProvider, type ScorecardFantasyResult } from "./cricbuzz-live.service.ts";
+import { CricbuzzLiveService, type CricbuzzLivePreview, type LiveMatchHints, type LiveProvider, type ScorecardFantasyResult } from "./cricbuzz-live.service.ts";
 import { LivePollerService, type LivePollerStatus } from "./live-poller.service.ts";
 
 type ApiResponse<T> = { success: boolean; data?: T; error?: string };
@@ -17,10 +17,11 @@ export class CricbuzzLiveController {
     sample = false,
     proxy = true,
     provider: LiveProvider = "auto",
-    safe = false
+    safe = false,
+    hints?: LiveMatchHints
   ): Promise<ApiResponse<CricbuzzLivePreview>> {
     try {
-      const preview = await this.service.getLivePreview(matchId, sample, proxy, provider);
+      const preview = await this.service.getLivePreview(matchId, sample, proxy, provider, hints);
       return { success: true, data: preview };
     } catch (error) {
       if (safe) {
@@ -57,9 +58,9 @@ export class CricbuzzLiveController {
     return {
       success: true,
       data: {
-        python: status.python,
-        beautifulsoup4: status.bs4,
-        requests: status.requests,
+        espn: status.espn,
+        cricbuzz: status.cricbuzz,
+        cricketdata: status.cricketdata,
         message: status.message
       }
     };

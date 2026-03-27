@@ -45,6 +45,46 @@ async function bootstrap() {
         return;
       }
 
+      if (method === "GET" && pathname === "/api/live/cricbuzz/preview") {
+        const matchId = url.searchParams.get("matchId") || undefined;
+        const teamA = url.searchParams.get("teamA") || undefined;
+        const teamB = url.searchParams.get("teamB") || undefined;
+        const series = url.searchParams.get("series") || undefined;
+        const sampleParam = url.searchParams.get("sample");
+        const sample = sampleParam === "true" || sampleParam === "1";
+        const proxy = url.searchParams.get("proxy") !== "false";
+        const providerParam = (url.searchParams.get("provider") || "auto") as "auto" | "espn" | "cricbuzz" | "cricketdata";
+        const safeParam = url.searchParams.get("safe");
+        const safe = safeParam === "true" || safeParam === "1";
+        sendJson(response, 200, await app.liveController.getPreview(matchId, sample, proxy, providerParam, safe, {
+          teamA,
+          teamB,
+          series
+        }));
+        return;
+      }
+
+      if (method === "GET" && pathname === "/api/live/cricbuzz/health") {
+        sendJson(response, 200, await app.liveController.getHealthStatus());
+        return;
+      }
+
+      if (method === "GET" && pathname === "/api/live/scorecard/fantasy") {
+        const matchId = url.searchParams.get("matchId") || undefined;
+        sendJson(response, 200, await app.liveController.getScorecardFantasyPoints(matchId));
+        return;
+      }
+
+      if (method === "GET" && pathname === "/api/live/cricbuzz/poller/status") {
+        sendJson(response, 200, app.liveController.getPollerStatus());
+        return;
+      }
+
+      if (method === "GET" && pathname === "/api/live/cricbuzz/poller/latest") {
+        sendJson(response, 200, app.liveController.getLatestFromPoller());
+        return;
+      }
+
       let authUser;
       try {
         authUser = await app.authController.requireUser(request);
@@ -82,29 +122,6 @@ async function bootstrap() {
         return;
       }
 
-      if (method === "GET" && pathname === "/api/live/cricbuzz/preview") {
-        const matchId = url.searchParams.get("matchId") || undefined;
-        const sampleParam = url.searchParams.get("sample");
-        const sample = sampleParam === "true" || sampleParam === "1";
-        const proxy = url.searchParams.get("proxy") !== "false";
-        const providerParam = (url.searchParams.get("provider") || "auto") as "auto" | "cricbuzz" | "espn" | "cricapi" | "cricketdata";
-        const safeParam = url.searchParams.get("safe");
-        const safe = safeParam === "true" || safeParam === "1";
-        sendJson(response, 200, await app.liveController.getPreview(matchId, sample, proxy, providerParam, safe));
-        return;
-      }
-
-      if (method === "GET" && pathname === "/api/live/cricbuzz/health") {
-        sendJson(response, 200, await app.liveController.getHealthStatus());
-        return;
-      }
-
-      if (method === "GET" && pathname === "/api/live/scorecard/fantasy") {
-        const matchId = url.searchParams.get("matchId") || undefined;
-        sendJson(response, 200, await app.liveController.getScorecardFantasyPoints(matchId));
-        return;
-      }
-
       if (method === "POST" && pathname === "/api/live/cricbuzz/poller/start") {
         const body = await readJsonBody(request);
         const queryProvider = url.searchParams.get("provider");
@@ -113,7 +130,7 @@ async function bootstrap() {
         const queryProxy = url.searchParams.get("proxy");
         const querySample = url.searchParams.get("sample");
 
-        const provider = (typeof body.provider === "string" ? body.provider : queryProvider || "auto") as "auto" | "cricbuzz" | "espn" | "cricapi" | "cricketdata";
+        const provider = (typeof body.provider === "string" ? body.provider : queryProvider || "auto") as "auto" | "espn" | "cricbuzz" | "cricketdata";
         const intervalFromBody = typeof body.intervalMs === "number" ? body.intervalMs : undefined;
         const intervalFromQuery = queryInterval ? Number(queryInterval) : undefined;
         const intervalMs = intervalFromBody ?? (Number.isFinite(intervalFromQuery) ? (url.searchParams.get("intervalSeconds") ? (intervalFromQuery as number) * 1000 : intervalFromQuery) : 60_000);
@@ -132,16 +149,6 @@ async function bootstrap() {
 
       if (method === "POST" && pathname === "/api/live/cricbuzz/poller/stop") {
         sendJson(response, 200, app.liveController.stopPoller());
-        return;
-      }
-
-      if (method === "GET" && pathname === "/api/live/cricbuzz/poller/status") {
-        sendJson(response, 200, app.liveController.getPollerStatus());
-        return;
-      }
-
-      if (method === "GET" && pathname === "/api/live/cricbuzz/poller/latest") {
-        sendJson(response, 200, app.liveController.getLatestFromPoller());
         return;
       }
 

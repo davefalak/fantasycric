@@ -52,7 +52,7 @@ export class AppModule {
     const shouldAutoStart = process.env.LIVE_POLL_AUTO_START !== "false";
     if (shouldAutoStart) {
       this.livePoller.start({
-        provider: (process.env.LIVE_PROVIDER as "auto" | "cricbuzz" | "espn" | "cricapi" | "cricketdata") || "auto",
+        provider: (process.env.LIVE_PROVIDER as "auto" | "espn" | "cricbuzz" | "cricketdata") || "auto",
         intervalMs: Number(process.env.LIVE_POLL_INTERVAL_MS || 60_000),
         proxy: process.env.LIVE_PROVIDER_PROXY !== "false",
         sample: process.env.LIVE_POLL_SAMPLE === "true",

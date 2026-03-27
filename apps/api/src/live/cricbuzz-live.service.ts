@@ -1,10 +1,12 @@
 import { scorePlayerMatch, type ScoreBreakdown } from "../scoring/scoring-engine.ts";
-import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import path from "node:path";
-import { promisify } from "node:util";
 
-export type LiveProvider = "auto" | "cricbuzz" | "espn" | "cricapi" | "cricketdata";
+export type LiveProvider = "auto" | "espn" | "cricbuzz" | "cricketdata";
+
+export interface LiveMatchHints {
+  teamA?: string;
+  teamB?: string;
+  series?: string;
+}
 
 export interface LiveMatchSummary {
   matchId: string;
@@ -102,7 +104,7 @@ export interface ScorecardFantasyResult {
 }
 
 export interface CricbuzzLivePreview {
-  source: "cricbuzz" | "espn" | "cricapi" | "cricketdata";
+  source: "cricbuzz" | "espn" | "cricketdata";
   fetchedAt: string;
   matchId: string;
   matchUrl: string;
@@ -120,7 +122,6 @@ export class CricbuzzLiveService {
   private readonly cricketDataApiKey: string;
   private readonly cricketDataCacheTtlMs: number;
   private readonly cricketDataDailyHitBudget: number;
-  private readonly runExecFile = promisify(execFile);
   private readonly cricketDataCache = new Map<string, { preview: CricbuzzLivePreview; expiresAt: number }>();
   private cricketDataHitsDayKey: string;
   private cricketDataHitsUsedToday: number;
@@ -139,63 +140,48 @@ export class CricbuzzLiveService {
     matchId?: string,
     useSample = false,
     allowProxy = true,
-    provider: LiveProvider = "auto"
+    provider: LiveProvider = "auto",
+    hints?: LiveMatchHints
   ): Promise<CricbuzzLivePreview> {
     if (useSample) {
       return this.getSamplePreview(matchId || "148962");
     }
 
-    if (provider === "cricbuzz") {
-      return this.getCricbuzzPreview(matchId, allowProxy);
-    }
-
     if (provider === "espn") {
-      return this.getEspnPreview(matchId, allowProxy);
+      return this.getEspnPreview(matchId, allowProxy, hints);
     }
 
-    if (provider === "cricapi") {
-      return this.getCricApiPreview(matchId, allowProxy);
+    if (provider === "cricbuzz") {
+      return this.getCricbuzzPreview(matchId, allowProxy, hints);
     }
 
     if (provider === "cricketdata") {
-      return this.getCricketDataPreview(matchId);
+      return this.getCricketDataPreview(matchId, hints);
     }
 
     const errors: string[] = [];
     try {
-      return await this.getCricbuzzPreview(matchId, allowProxy);
-    } catch (error) {
-      errors.push(`cricbuzz: ${error instanceof Error ? error.message : "failed"}`);
-    }
-
-    try {
-      return await this.getEspnPreview(matchId, allowProxy);
+      return await this.getEspnPreview(matchId, allowProxy, hints);
     } catch (error) {
       errors.push(`espn: ${error instanceof Error ? error.message : "failed"}`);
     }
 
     try {
-      return await this.getCricApiPreview(matchId, allowProxy);
+      return await this.getCricbuzzPreview(matchId, allowProxy, hints);
     } catch (error) {
-      errors.push(`cricapi: ${error instanceof Error ? error.message : "failed"}`);
+      errors.push(`cricbuzz: ${error instanceof Error ? error.message : "failed"}`);
     }
 
     try {
-      return await this.getCricketDataPreview(matchId);
+      return await this.getCricketDataPreview(matchId, hints);
     } catch (error) {
       errors.push(`cricketdata: ${error instanceof Error ? error.message : "failed"}`);
-    }
-
-    const bs4Preview = await this.getBeautifulSoupPreview(matchId);
-    if (bs4Preview) {
-      bs4Preview.notes.push(`Auto fallback summary: ${errors.join(" | ")}`);
-      return bs4Preview;
     }
 
     return this.buildFallbackSample(matchId, errors);
   }
 
-  private async getCricketDataPreview(matchId?: string): Promise<CricbuzzLivePreview> {
+  private async getCricketDataPreview(matchId?: string, hints?: LiveMatchHints): Promise<CricbuzzLivePreview> {
     if (!this.cricketDataApiKey) {
       throw new Error("CRICKETDATA_API_KEY is not configured.");
     }
@@ -237,7 +223,7 @@ export class CricbuzzLiveService {
 
     const payload = await this.fetchCricketDataJson("currentMatches", { offset: "0" });
     const matches = Array.isArray(payload.data) ? payload.data as Array<Record<string, unknown>> : [];
-    const picked = this.pickCurrentCricketDataMatch(matches);
+    const picked = this.pickCurrentCricketDataMatch(matches, hints);
     if (!picked) {
       throw new Error("CricketData currentMatches returned no active match.");
     }
@@ -495,7 +481,30 @@ export class CricbuzzLiveService {
     };
   }
 
-  private pickCurrentCricketDataMatch(matches: Array<Record<string, unknown>>): Record<string, unknown> | undefined {
+  private pickCurrentCricketDataMatch(matches: Array<Record<string, unknown>>, hints?: LiveMatchHints): Record<string, unknown> | undefined {
+    if (hints?.teamA && hints?.teamB) {
+      const wantedA = this.normalizeTeamName(hints.teamA);
+      const wantedB = this.normalizeTeamName(hints.teamB);
+      const wantedSeries = this.normalizeTeamName(hints.series || "");
+
+      const filtered = matches.filter((match) => {
+        const teams = Array.isArray(match.teams) ? (match.teams as unknown[]).map((value) => this.normalizeTeamName(String(value || ""))) : [];
+        const hasTeams = teams.some((team) => team.includes(wantedA) || wantedA.includes(team))
+          && teams.some((team) => team.includes(wantedB) || wantedB.includes(team));
+        if (!hasTeams) return false;
+        if (!wantedSeries) return true;
+        const series = this.normalizeTeamName(String(match.series_id || ""));
+        const name = this.normalizeTeamName(String(match.name || ""));
+        return series.includes(wantedSeries) || name.includes(wantedSeries);
+      });
+
+      if (filtered.length > 0) {
+        return filtered.find((match) => match.matchStarted === true && match.matchEnded !== true)
+          || filtered.find((match) => match.matchEnded !== true)
+          || filtered[0];
+      }
+    }
+
     return matches.find((match) => match.matchStarted === true && match.matchEnded !== true)
       || matches.find((match) => match.matchEnded !== true)
       || matches[0];
@@ -620,64 +629,8 @@ export class CricbuzzLiveService {
     return fallback;
   }
 
-  private async getBeautifulSoupPreview(matchId?: string): Promise<CricbuzzLivePreview | null> {
-    const scriptCandidates = [
-      path.resolve(process.cwd(), "scripts/live_bs4_scraper.py"),
-      path.resolve(process.cwd(), "../../scripts/live_bs4_scraper.py")
-    ];
-    const scriptPath = scriptCandidates.find((candidate) => existsSync(candidate));
-    if (!scriptPath) {
-      return null;
-    }
-    try {
-      const args = [scriptPath, "--provider", "cricbuzz", "--base-url", this.baseUrl];
-      if (matchId) {
-        args.push("--match-id", matchId);
-      }
-
-      const { stdout } = await this.runExecFile("python3", args, { timeout: 20_000 });
-      const parsed = JSON.parse(stdout) as {
-        success?: boolean;
-        error?: string;
-        source?: CricbuzzLivePreview["source"];
-        fetchedAt?: string;
-        matchId?: string;
-        matchUrl?: string;
-        fetchedFromUrl?: string;
-        scoreText?: string;
-        batting?: LiveBattingStat[];
-        bowling?: LiveBowlingStat[];
-        notes?: string[];
-      };
-
-      if (!parsed.success) {
-        return null;
-      }
-
-      const batting = Array.isArray(parsed.batting) ? parsed.batting : [];
-      const bowling = Array.isArray(parsed.bowling) ? parsed.bowling : [];
-      return {
-        source: parsed.source || "cricbuzz",
-        fetchedAt: parsed.fetchedAt || new Date().toISOString(),
-        matchId: parsed.matchId || matchId || "",
-        matchUrl: parsed.matchUrl || `${this.baseUrl}/live-cricket-scorecard/${matchId || ""}`,
-        fetchedFromUrl: parsed.fetchedFromUrl || "python://beautifulsoup",
-        scoreText: parsed.scoreText,
-        batting: this.dedupeByName(batting.filter((row) => row.playerName)),
-        bowling: this.dedupeByName(bowling.filter((row) => row.playerName)),
-        fantasyPlayers: this.buildFantasyPlayers(batting, bowling),
-        notes: [
-          "Parsed via Python BeautifulSoup fallback scraper.",
-          ...(Array.isArray(parsed.notes) ? parsed.notes : [])
-        ]
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  private async getCricbuzzPreview(matchId?: string, allowProxy = true): Promise<CricbuzzLivePreview> {
-    const targetMatchId = matchId || await this.getFirstLiveMatchId(allowProxy);
+  private async getCricbuzzPreview(matchId?: string, allowProxy = true, hints?: LiveMatchHints): Promise<CricbuzzLivePreview> {
+    const targetMatchId = matchId || await this.getFirstLiveMatchId(allowProxy, hints);
     const scorecardUrl = `${this.baseUrl}/live-cricket-scorecard/${targetMatchId}`;
     const fetched = await this.fetchPage(scorecardUrl, allowProxy);
 
@@ -693,17 +646,41 @@ export class CricbuzzLiveService {
     return parsed;
   }
 
-  private async getEspnPreview(matchId?: string, allowProxy = true): Promise<CricbuzzLivePreview> {
-    const scoreboardUrl = "https://site.web.api.espn.com/apis/v2/sports/cricket/scoreboard";
-    const board = await this.fetchJson(scoreboardUrl, allowProxy);
+  private async getEspnPreview(matchId?: string, allowProxy = true, hints?: LiveMatchHints): Promise<CricbuzzLivePreview> {
+    const scoreboardUrls = [
+      "https://site.web.api.espn.com/apis/v2/sports/cricket/scoreboard",
+      "https://site.api.espn.com/apis/site/v2/sports/cricket/scoreboard",
+      "https://site.api.espn.com/apis/site/v2/sports/cricket/scoreboard?region=in&lang=en&contentorigin=espn"
+    ];
+
+    let board: Record<string, unknown> | null = null;
+    let scoreboardUrl = scoreboardUrls[0];
+    const attempts: string[] = [];
+    for (const candidate of scoreboardUrls) {
+      try {
+        const payload = await this.fetchJson(candidate, allowProxy);
+        const events = Array.isArray(payload?.events) ? payload.events : [];
+        if (events.length > 0) {
+          board = payload;
+          scoreboardUrl = candidate;
+          break;
+        }
+        attempts.push(`${candidate}: no events`);
+      } catch (error) {
+        attempts.push(`${candidate}: ${error instanceof Error ? error.message : "failed"}`);
+      }
+    }
+
+    if (!board) {
+      throw new Error(`ESPN scoreboard lookup failed. ${attempts.join(" | ")}`);
+    }
+
     const events = Array.isArray(board?.events) ? board.events : [];
     if (events.length === 0) {
       throw new Error("ESPN scoreboard returned no live events");
     }
 
-    const picked = matchId
-      ? events.find((event: Record<string, unknown>) => String(event?.id || "") === String(matchId))
-      : events[0];
+    const picked = this.pickEspnEvent(events as Array<Record<string, unknown>>, matchId, hints);
     if (!picked) {
       throw new Error("Requested ESPN match not found on live scoreboard");
     }
@@ -728,7 +705,7 @@ export class CricbuzzLiveService {
       bowling: [],
       fantasyPlayers: [],
       notes: [
-        "Using ESPN public scoreboard endpoint.",
+        `Using ESPN public scoreboard endpoint: ${scoreboardUrl}`,
         "Player-level scorecard stats were not available from this free endpoint in current parse path."
       ]
     };
@@ -736,80 +713,7 @@ export class CricbuzzLiveService {
     return preview;
   }
 
-  private async getCricApiPreview(matchId?: string, allowProxy = true): Promise<CricbuzzLivePreview> {
-    const apiKey = process.env.CRICAPI_KEY || "";
-    if (!apiKey) {
-      throw new Error("CRICAPI_KEY is not configured. CricAPI free tier requires an API key.");
-    }
-
-    const targetMatchId = matchId || "";
-    if (!targetMatchId) {
-      throw new Error("matchId is required for CricAPI provider");
-    }
-
-    const scorecardUrl = `https://api.cricapi.com/v1/match_scorecard?apikey=${encodeURIComponent(apiKey)}&id=${encodeURIComponent(targetMatchId)}`;
-    const payload = await this.fetchJson(scorecardUrl, allowProxy);
-    const data = payload.data && typeof payload.data === "object"
-      ? payload.data as Record<string, unknown>
-      : payload;
-
-    const batting: LiveBattingStat[] = [];
-    const bowling: LiveBowlingStat[] = [];
-
-    const scorecard = Array.isArray(data.scorecard) ? data.scorecard : [];
-    for (const innings of scorecard as Array<Record<string, unknown>>) {
-      const bats = Array.isArray(innings.batting) ? innings.batting as Array<Record<string, unknown>> : [];
-      for (const row of bats) {
-        const batter = (row.batsman && typeof row.batsman === "object")
-          ? row.batsman as Record<string, unknown>
-          : undefined;
-        batting.push({
-          playerName: String((batter?.name as string) || row.name || "").trim(),
-          runs: Number(row.r || row.runs || 0),
-          balls: Number(row.b || row.balls || 0),
-          fours: Number(row.fours || row.f || 0),
-          sixes: Number(row.sixes || row.six || 0),
-          strikeRate: Number(row.sr || row.strikeRate || 0)
-        });
-      }
-
-      const bowls = Array.isArray(innings.bowling) ? innings.bowling as Array<Record<string, unknown>> : [];
-      for (const row of bowls) {
-        const bowler = (row.bowler && typeof row.bowler === "object")
-          ? row.bowler as Record<string, unknown>
-          : undefined;
-        bowling.push({
-          playerName: String((bowler?.name as string) || row.name || "").trim(),
-          overs: Number(row.o || row.overs || 0),
-          maidens: Number(row.m || row.maidens || 0),
-          runsConceded: Number(row.r || row.runs || 0),
-          wickets: Number(row.w || row.wkts || 0)
-        });
-      }
-    }
-
-    const dedupBatting = this.dedupeByName(batting.filter((row) => row.playerName));
-    const dedupBowling = this.dedupeByName(bowling.filter((row) => row.playerName));
-    const fantasyPlayers = this.buildFantasyPlayers(dedupBatting, dedupBowling);
-
-    return {
-      source: "cricapi",
-      fetchedAt: new Date().toISOString(),
-      matchId: targetMatchId,
-      matchUrl: scorecardUrl,
-      fetchedFromUrl: scorecardUrl,
-      scoreText: typeof data.status === "string" ? data.status : undefined,
-      batting: dedupBatting,
-      bowling: dedupBowling,
-      fantasyPlayers,
-      notes: [
-        "CricAPI provider used (free tier with API key).",
-        "No DB writes were performed."
-      ]
-    };
-  }
-
-  private async getFirstLiveMatchId(allowProxy: boolean): Promise<string> {
+  private async getFirstLiveMatchId(allowProxy: boolean, hints?: LiveMatchHints): Promise<string> {
     const liveUrl = `${this.baseUrl}/cricket-match/live-scores`;
     const fetched = await this.fetchPage(liveUrl, allowProxy);
     const html = fetched.html;
@@ -817,7 +721,67 @@ export class CricbuzzLiveService {
     if (matches.length === 0) {
       throw new Error("No live matches found on Cricbuzz");
     }
+    if (hints?.teamA && hints?.teamB) {
+      const tokenA = this.normalizeTeamName(hints.teamA).split(" ")[0];
+      const tokenB = this.normalizeTeamName(hints.teamB).split(" ")[0];
+      const picked = matches.find((match) => {
+        const slug = this.normalizeTeamName(match.url);
+        return slug.includes(tokenA) && slug.includes(tokenB);
+      });
+      if (picked) {
+        return picked.matchId;
+      }
+    }
     return matches[0].matchId;
+  }
+
+  private pickEspnEvent(events: Array<Record<string, unknown>>, matchId?: string, hints?: LiveMatchHints): Record<string, unknown> | undefined {
+    if (matchId) {
+      const byId = events.find((event) => String(event?.id || "") === String(matchId));
+      if (byId) {
+        return byId;
+      }
+    }
+
+    if (hints?.teamA && hints?.teamB) {
+      const wantedA = this.normalizeTeamName(hints.teamA);
+      const wantedB = this.normalizeTeamName(hints.teamB);
+
+      const byTeams = events.find((event) => {
+        const teams = this.getEspnTeamNames(event).map((name) => this.normalizeTeamName(name));
+        return teams.some((team) => team.includes(wantedA) || wantedA.includes(team))
+          && teams.some((team) => team.includes(wantedB) || wantedB.includes(team));
+      });
+      if (byTeams) {
+        return byTeams;
+      }
+    }
+
+    return events[0];
+  }
+
+  private getEspnTeamNames(event: Record<string, unknown>): string[] {
+    const comp = Array.isArray(event.competitions) ? (event.competitions[0] as Record<string, unknown> | undefined) : undefined;
+    const competitors = comp && Array.isArray(comp.competitors) ? comp.competitors as Array<Record<string, unknown>> : [];
+    const names: string[] = [];
+    for (const competitor of competitors) {
+      const team = competitor.team && typeof competitor.team === "object" ? competitor.team as Record<string, unknown> : undefined;
+      const candidates = [team?.displayName, team?.shortDisplayName, team?.name, team?.abbreviation, competitor.displayName];
+      for (const candidate of candidates) {
+        if (typeof candidate === "string" && candidate.trim()) {
+          names.push(candidate.trim());
+        }
+      }
+    }
+    return names;
+  }
+
+  private normalizeTeamName(value: string): string {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   private extractLiveMatchLinks(html: string): LiveMatchSummary[] {
@@ -836,27 +800,42 @@ export class CricbuzzLiveService {
   }
 
   private async fetchPage(url: string, allowProxy: boolean): Promise<{ html: string; fetchedFromUrl: string }> {
+    const requestHeaders: Record<string, string> = {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      "Pragma": "no-cache"
+    };
+
     let response: Response | null = null;
-    try {
-      response = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; FantasyIPLBot/1.0)",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    let lastNetworkError: string | null = null;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        response = await fetch(url, { headers: requestHeaders });
+        if (response.ok) {
+          return { html: await response.text(), fetchedFromUrl: url };
         }
-      });
-    } catch (error) {
-      if (!allowProxy) {
-        const message = error instanceof Error ? error.message : "unknown fetch error";
-        throw new Error(`Cricbuzz fetch failed for ${url}: ${message}`);
+
+        // Retry transient blocks/errors before falling back to proxy.
+        if ([403, 408, 425, 429, 500, 502, 503, 504].includes(response.status) && attempt < 3) {
+          await this.sleep(attempt * 300);
+          continue;
+        }
+        break;
+      } catch (error) {
+        lastNetworkError = error instanceof Error ? error.message : "unknown fetch error";
+        if (attempt < 3) {
+          await this.sleep(attempt * 300);
+          continue;
+        }
       }
     }
 
-    if (response?.ok) {
-      return { html: await response.text(), fetchedFromUrl: url };
-    }
-
     if (!allowProxy) {
-      const status = response ? `HTTP ${response.status}` : "fetch failed";
+      const status = response
+        ? `HTTP ${response.status}`
+        : `fetch failed${lastNetworkError ? `: ${lastNetworkError}` : ""}`;
       throw new Error(`Cricbuzz fetch failed for ${url}: ${status}`);
     }
 
@@ -865,7 +844,7 @@ export class CricbuzzLiveService {
     try {
       proxyResp = await fetch(proxyUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; FantasyIPLBot/1.0)",
+          "User-Agent": requestHeaders["User-Agent"],
           "Accept": "text/plain,*/*;q=0.8"
         }
       });
@@ -893,6 +872,10 @@ export class CricbuzzLiveService {
       }
       throw new Error(`Failed to parse JSON payload from ${fetched.fetchedFromUrl}`);
     }
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private parseScorecardText(
@@ -1103,57 +1086,38 @@ export class CricbuzzLiveService {
     return parsed;
   }
 
-  async getHealthStatus(): Promise<{ python: boolean; bs4: boolean; requests: boolean; message: string }> {
-    const scriptCandidates = [
-      path.resolve(process.cwd(), "scripts/requirements.txt"),
-      path.resolve(process.cwd(), "../../scripts/requirements.txt")
-    ];
-    const scriptPath = scriptCandidates.find((candidate) => existsSync(candidate));
-    const hasRequirements = !!scriptPath;
-
-    let pythonAvailable = false;
-    let bs4Available = false;
-    let requestsAvailable = false;
+  async getHealthStatus(): Promise<{ espn: boolean; cricbuzz: boolean; cricketdata: boolean; message: string }> {
+    let espn = false;
+    let cricbuzz = false;
+    let cricketdata = false;
 
     try {
-      await this.runExecFile("python3", ["--version"], { timeout: 5_000 });
-      pythonAvailable = true;
+      await this.fetchJson("https://site.api.espn.com/apis/site/v2/sports/cricket/scoreboard", true);
+      espn = true;
     } catch {
-      /* python not found or failed */
+      /* espn endpoint unavailable */
     }
 
-    if (pythonAvailable) {
-      try {
-        await this.runExecFile("python3", ["-c", "import bs4"], { timeout: 5_000 });
-        bs4Available = true;
-      } catch {
-        /* bs4 not installed */
-      }
-      try {
-        await this.runExecFile("python3", ["-c", "import requests"], { timeout: 5_000 });
-        requestsAvailable = true;
-      } catch {
-        /* requests not installed */
-      }
+    try {
+      await this.fetchPage(`${this.baseUrl}/cricket-match/live-scores`, true);
+      cricbuzz = true;
+    } catch {
+      /* cricbuzz unavailable */
     }
 
-    const allReady = pythonAvailable && bs4Available && requestsAvailable && hasRequirements;
-    const message = allReady
-      ? "All BeautifulSoup dependencies ready"
-      : `Missing: ${[
-          !pythonAvailable && "python3",
-          !hasRequirements && "requirements.txt",
-          !bs4Available && "beautifulsoup4",
-          !requestsAvailable && "requests"
-        ]
-          .filter(Boolean)
-          .join(", ")}`;
+    try {
+      await this.fetchCricketDataJson("currentMatches", { offset: "0" });
+      cricketdata = true;
+    } catch {
+      /* cricketdata unavailable */
+    }
 
+    const readyCount = [espn, cricbuzz, cricketdata].filter(Boolean).length;
     return {
-      python: pythonAvailable,
-      bs4: bs4Available,
-      requests: requestsAvailable,
-      message
+      espn,
+      cricbuzz,
+      cricketdata,
+      message: `${readyCount}/3 live providers are currently reachable`
     };
   }
 }
